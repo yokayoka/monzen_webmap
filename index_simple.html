@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>能登半島マップ（モバイル対応）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { height: 100dvh; width: 100%; }
+    .leaflet-touch .leaflet-bar a { width: 42px; height: 42px; line-height: 42px; font-size: 16px; }
+    .leaflet-bottom.leaflet-right { z-index: 1100; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const ini = { lat: 37.29182, lng: 137.76769, zoom: 13 };
+    const map = L.map('map', {
+      center: [ini.lat, ini.lng],
+      zoom: ini.zoom,
+      zoomControl: false,
+      tap: true,
+      tapTolerance: 15
+    });
+
+    // Add zoom control at bottom-right
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // Base layers
+    const lyrbfCSMap = L.tileLayer('https://www2.ffpri.go.jp/soilmap/tile/cs_noto/{z}/{x}/{y}.png', {
+      attribution: "CSMap by FFPRI", minZoom: 8, maxZoom: 17
+    }).addTo(map);
+    const lyrafCSMap = L.tileLayer('https://rinya.geospatial.jp/tile/csmaptile_noto/{z}/{x}/{y}.png', {
+      attribution: "Forestry Agency", minZoom: 8, maxZoom: 17
+    });
+    const baseMaps = {
+      "災害前CS立体図": lyrbfCSMap,
+      "災害後CS立体図": lyrafCSMap
+    };
+
+    // Overlays
+    const lyrGSI = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+      { opacity: 0.3, attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>" });
+    const lyrGoogleHybrid = L.tileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}");
+
+    const overlays = {
+      "地理院地図": lyrGSI,
+      "Google高解像度": lyrGoogleHybrid
+    };
+
+    L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
+
+    addEventListener('orientationchange', () => setTimeout(() => map.invalidateSize(), 250));
+    addEventListener('resize', () => setTimeout(() => map.invalidateSize(), 250));
+  </script>
+</body>
+</html>
