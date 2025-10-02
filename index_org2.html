@@ -9,14 +9,25 @@
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: 100dvh; width: 100%; }
+    /* タップしやすいUI */
     .leaflet-touch .leaflet-bar a { width: 42px; height: 42px; line-height: 42px; font-size: 16px; }
+
+    /* 右上コントロール（レイヤー）を前面に */
     .leaflet-top.leaflet-right { z-index: 1100; }
+    /* 右下コントロール（ズーム＋現在地）を前面に */
     .leaflet-bottom.leaflet-right { z-index: 1100; }
+
+    /* 現在地ボタンの見た目（Leaflet標準バーに合わせる） */
     .leaflet-control-locate.leaflet-bar a {
-      text-align: center; text-decoration: none; display: block;
-      font-size: 20px; line-height: 42px;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+      font-size: 20px;
+      line-height: 42px;
     }
-    .leaflet-control-locate.leaflet-bar a:focus { outline: none; }
+    .leaflet-control-locate.leaflet-bar a:focus {
+      outline: none;
+    }
   </style>
 </head>
 <body>
@@ -25,23 +36,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // --- 既定値（パラメータが無いとき用） ---
+    // --- 初期中心（変更後の座標に合わせてください） ---
     const ini = { lat: 37.2934, lng: 136.7883, zoom: 13 };
-
-    // URLパラメータで上書き: ?y=<lat>&x=<lng>&z=<zoom>
-    (function applyUrlCenter() {
-      const p = new URLSearchParams(location.search);
-      const y = parseFloat(p.get('y'));   // 緯度
-      const x = parseFloat(p.get('x'));   // 経度
-      const z = parseInt(p.get('z'), 10); // ズーム
-      if (Number.isFinite(y) && y >= -90 && y <= 90 &&
-          Number.isFinite(x) && x >= -180 && x <= 180) {
-        ini.lat = y; ini.lng = x;
-      }
-      if (Number.isFinite(z)) ini.zoom = Math.min(19, Math.max(4, z));
-    })();
-
-    // ---- 地図本体（※初期化は1回だけ）----
+// 37.29340207473085, 136.78831307607857
+    // ズームは右下に出したいので、map初期化時は zoomControl: false にして後から追加
     const map = L.map('map', {
       center: [ini.lat, ini.lng],
       zoom: ini.zoom,
@@ -73,12 +71,16 @@
       "Google高解像度": lyrGoogleHybrid
     };
 
-    // ---- Overlays（空の GeoJSON レイヤを用意）----
+    // ---- Overlays ----
+    // 1) まず中身が空の GeoJSON レイヤを作る（ここに後でデータを流し込む）
     const jsonArtif = L.geoJSON(null, {
+      // ポイント表現（必要なら調整）
       pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
         radius: 5, weight: 1, color: '#b22222', fillColor: '#ff6666', fillOpacity: 0.7
       }),
+      // ライン/ポリゴンのスタイル（必要なら調整）
       style: () => ({ color: '#b22222', weight: 2, fillOpacity: 0.3 }),
+      // クリック時の内容（プロパティ名は実データに合わせて調整）
       onEachFeature: (feature, layer) => {
         const p = feature.properties || {};
         const html = [
@@ -106,67 +108,117 @@
       }
     });
 
-    // レイヤーコントロール（右上）
+    // 2) レイヤーコントロールに登録（右上）
     const overlays = {
       "崩壊（人為）": jsonArtif,
       "崩壊（自然）": jsonNatural
     };
     L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
 
-    // ---- GeoJSON の読み込み ----
-    // ※ 初期表示からONにしたい場合は、読み込み後に addTo(map) する
-    //    さらに全体へ寄せたい場合は fitBounds する
-    Promise.all([
-      fetch('src/json/artif.json').then(r => r.json()).then(g => { jsonArtif.addData(g); }),
-      fetch('src/json/natural.json').then(r => r.json()).then(g => { jsonNatural.addData(g); }).catch(()=>{})
-    ]).then(() => {
-      // 初期表示でONにしたいならコメント解除
-      // if (jsonArtif.getLayers().length) jsonArtif.addTo(map);
-      // if (jsonNatural.getLayers().length) jsonNatural.addTo(map);
+    // 3) JSON を非同期で読み込んで、作ったレイヤに addData する
+    //    GitHub Pages で配信するなら相対パスでOK（大文字小文字の違いに注意）
+    fetch('src/json/artif.json')
+      .then(r => r.json())
+      .then(geojson => { jsonArtif.addData(geojson); })
+      .catch(err => console.error('artif.json 読み込み失敗:', err));
 
-      // 両方の範囲に自動で寄せたい場合（任意）
-      // const group = L.featureGroup([jsonArtif, jsonNatural].filter(l => l.getLayers().length));
-      // if (group.getLayers().length) map.fitBounds(group.getBounds().pad(0.1));
-    }).catch(err => {
-      console.error('GeoJSON 読み込みエラー:', err);
-    });
+    fetch('src/json/natural.json')
+      .then(r => r.json())
+      .then(geojson => { jsonNatural.addData(geojson); })
+      .catch(err => console.error('natural.json 読み込み失敗:', err));
+
+
+
+    // const overlays = {
+    //   "崩壊（人為）": jsonArtif,
+    //   "崩壊（自然）": jsonNatural
+    // };
+
+    // レイヤーコントロールは右上
+    // L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
 
     // ======== 現在地表示（GPS）機能 ========
-    let locateMarker = null, locateCircle = null;
+    let locateMarker = null;
+    let locateCircle = null;
+
     function showLocation(lat, lng, accuracy) {
       const latlng = [lat, lng];
-      if (!locateMarker) locateMarker = L.marker(latlng, { title: "現在地" }).addTo(map);
-      else locateMarker.setLatLng(latlng);
+      if (!locateMarker) {
+        locateMarker = L.marker(latlng, { title: "現在地" }).addTo(map);
+      } else {
+        locateMarker.setLatLng(latlng);
+      }
 
-      if (!locateCircle) locateCircle = L.circle(latlng, { radius: accuracy || 30, color: '#136aec', fillColor: '#136aec', fillOpacity: 0.15, weight: 2 }).addTo(map);
-      else { locateCircle.setLatLng(latlng); if (accuracy) locateCircle.setRadius(accuracy); }
+      if (!locateCircle) {
+        locateCircle = L.circle(latlng, { radius: accuracy || 30, color: '#136aec', fillColor: '#136aec', fillOpacity: 0.15, weight: 2 }).addTo(map);
+      } else {
+        locateCircle.setLatLng(latlng);
+        if (accuracy) locateCircle.setRadius(accuracy);
+      }
 
-      map.setView(latlng, Math.max(map.getZoom(), 15), { animate: true });
+      // 現在のズームが低い場合は少し寄せる
+      const targetZoom = Math.max(map.getZoom(), 15);
+      map.setView(latlng, targetZoom, { animate: true });
     }
+
     function locateOnce() {
-      if (!navigator.geolocation) { alert("この端末/ブラウザは位置情報に対応していません。"); return; }
+      if (!navigator.geolocation) {
+        alert("この端末/ブラウザは位置情報に対応していません。");
+        return;
+      }
       navigator.geolocation.getCurrentPosition(
-        pos => showLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
-        err => {
-          console.warn("Geolocation error:", err);
-          alert("位置情報の取得に失敗しました（権限/環境をご確認ください）。");
+        (pos) => {
+          showLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        (err) => {
+          // 典型的なエラー：PERMISSION_DENIED, POSITION_UNAVAILABLE, TIMEOUT
+          console.warn("Geolocation error:", err);
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              alert("位置情報の利用が許可されていません。ブラウザの設定をご確認ください。");
+              break;
+            case err.POSITION_UNAVAILABLE:
+              alert("現在地を特定できませんでした。屋外で再試行してください。");
+              break;
+            case err.TIMEOUT:
+              alert("位置情報の取得がタイムアウトしました。回線状況をご確認ください。");
+              break;
+            default:
+              alert("位置情報の取得に失敗しました。");
+          }
+        },
+        {
+          enableHighAccuracy: true, // できるだけ精度の高い位置
+          timeout: 10000,           // 10秒でタイムアウト
+          maximumAge: 0             // キャッシュは使わない
+        }
       );
     }
+
+    // Leafletのバーに「📍（現在地）」ボタンを追加（右下・ズームボタンの上側に並ぶ）
     const LocateControl = L.Control.extend({
       options: { position: 'bottomright' },
       onAdd: function() {
         const container = L.DomUtil.create('div', 'leaflet-control-locate leaflet-bar');
         const link = L.DomUtil.create('a', '', container);
-        link.href = '#'; link.title = '現在地へ移動'; link.setAttribute('role', 'button'); link.setAttribute('aria-label', '現在地へ移動'); link.innerHTML = '📍';
+        link.href = '#';
+        link.title = '現在地へ移動';
+        link.setAttribute('role', 'button');
+        link.setAttribute('aria-label', '現在地へ移動');
+        link.innerHTML = '📍';
+
+        // マップのドラッグ・ズームを抑止しつつクリック処理
         L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(link, 'click', (e) => { L.DomEvent.preventDefault(e); locateOnce(); });
+        L.DomEvent.on(link, 'click', (e) => {
+          L.DomEvent.preventDefault(e);
+          locateOnce();
+        });
         return container;
       }
     });
     map.addControl(new LocateControl());
 
+    // 画面回転や高さ変化に追従
     addEventListener('orientationchange', () => setTimeout(() => map.invalidateSize(), 250));
     addEventListener('resize', () => setTimeout(() => map.invalidateSize(), 250));
   </script>
