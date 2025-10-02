@@ -84,7 +84,7 @@
 
     const lyrOrt1991 = L.tileLayer(
       "tiles/ort1991/{z}/{x}/{y}.png", {
-      attribution: "FFPRI", minZoom: 8, maxZoom: 17
+      attribution: "FFPRI", minZoom: 10, maxZoom: 17
     });
 
     const baseMaps = {
@@ -164,13 +164,39 @@
       }
     });   
 
+    const difdem = L.tileLayer(
+      "tiles/maffdifdem/{z}/{x}/{y}.png", {
+      attribution: "Forestry Agency and GSI", minZoom: 10, maxZoom: 17, opacity: 0.7
+    });
+
+    // ---- Overlays（空の GeoJSON レイヤを用意）----
+    const jsonMaffCrack = L.geoJSON(null, {
+      style: () => ({
+        color: 'black',      // 黒色ライン
+        weight: 2            // 線の太さ（任意で調整可能）
+        // opacity は指定不要 → デフォルトで 1.0
+      }),
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties || {};
+        const html = [
+          p.name ? `<div><strong>${p.name}</strong></div>` : '',
+          p.type ? `<div>種別: ${p.type}</div>` : '',
+          p.date ? `<div>日付: ${p.date}</div>` : ''
+        ].join('');
+        if (html) layer.bindPopup(html);
+      },
+      attribution: "Forestry Agency and GSI"
+    });
+
 
     // レイヤーコントロール（右上）
     const overlays = {
       "崩壊（人為）": jsonArtif,
       "崩壊（自然）": jsonNatural,
       "豪雨後災害（地理院）": jsonHz_afst,
-      "盛土": jsonFill
+      "盛土": jsonFill,
+      "地形変化量（林野庁地理院）": difdem,
+      "亀裂（林野庁地理院）": jsonMaffCrack   // ★ 追加
     };
     L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
 
@@ -181,7 +207,8 @@
       fetch('src/json/artif.json').then(r => r.json()).then(g => { jsonArtif.addData(g); }),
       fetch('src/json/natural.json').then(r => r.json()).then(g => { jsonNatural.addData(g); }).catch(()=>{}),
       fetch('src/json/afst_gsi.geojson').then(r => r.json()).then(g => { jsonHz_afst.addData(g); }).catch(()=>{}),
-      fetch('src/json/fill.geojson').then(r => r.json()).then(g => { jsonFill.addData(g); }).catch(()=>{})
+      fetch('src/json/fill.geojson').then(r => r.json()).then(g => { jsonFill.addData(g); }).catch(()=>{}),
+      fetch('src/json/maff_crack.geojson').then(r => r.json()).then(g => { jsonMaffCrack.addData(g); }).catch(()=>{})
     ]).then(() => {
       // 初期表示でONにしたいならコメント解除
       // if (jsonArtif.getLayers().length) jsonArtif.addTo(map);
