@@ -169,6 +169,11 @@
       attribution: "Forestry Agency and GSI", minZoom: 10, maxZoom: 17, opacity: 0.7
     });
 
+    const afst_difdem = L.tileLayer(
+      "tiles/afst_difdem/{z}/{x}/{y}.png", {
+      attribution: "IPU", minZoom: 10, maxZoom: 17, opacity: 0.7
+    });
+
     // ---- Overlays（空の GeoJSON レイヤを用意）----
     const jsonMaffCrack = L.geoJSON(null, {
       style: () => ({
@@ -196,6 +201,7 @@
       "豪雨後災害（地理院）": jsonHz_afst,
       "盛土": jsonFill,
       "地形変化量（林野庁地理院）": difdem,
+      "豪雨後地形変化量（IPU）": afst_difdem,
       "亀裂（林野庁地理院）": jsonMaffCrack   // ★ 追加
     };
     L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
