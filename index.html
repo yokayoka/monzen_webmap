@@ -82,12 +82,18 @@
       attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>", minZoom: 10, maxZoom: 18
     });
 
+    const lyrOrt1991 = L.tileLayer(
+      "tiles/ort1991/{z}/{x}/{y}.png", {
+      attribution: "FFPRI", minZoom: 8, maxZoom: 17
+    });
+
     const baseMaps = {
       "地震前CS立体図": lyrbfCSMap,
       "地震後CS立体図": lyrafCSMap,
       "地理院地図": lyrGSI,
       "1960年代オルソ": lyrOrt60th,
       "1970年代オルソ": lyrOrt70th,
+      "1991年オルソ": lyrOrt1991,
       "Google高解像度（地震前）": lyrGoogleHybrid,
       "地震後オルソ": lyrOrt202404,
       "豪雨後オルソ": lyrOrt202409      
