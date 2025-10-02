@@ -128,9 +128,9 @@
 
      const jsonHz_afst = L.geoJSON(null, {
       pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
-        radius: 5, weight: 1, color: '#8b0000', fillColor: '#cd5c5c', fillOpacity: 0.7
+        radius: 5, weight: 1, color: '#000070', fillColor: '#4169e1', fillOpacity: 0.7
       }),
-      style: () => ({ color: '#0b5', weight: 2, fillOpacity: 0.3 }),
+      style: () => ({ color: '#000070', weight: 2, fillOpacity: 0.3 }),
       onEachFeature: (feature, layer) => {
         const p = feature.properties || {};
         const html = [
@@ -142,11 +142,29 @@
       }
     });   
 
+     const jsonFill = L.geoJSON(null, {
+      pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+        radius: 5, weight: 1, color: '#ffd700', fillColor: '#ffff00', fillOpacity: 0.7
+      }),
+      style: () => ({ color: '#ffd700', weight: 2, fillOpacity: 0.3 }),
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties || {};
+        const html = [
+          p.name ? `<div><strong>${p.name}</strong></div>` : '',
+          p.type ? `<div>種別: ${p.type}</div>` : '',
+          p.date ? `<div>日付: ${p.date}</div>` : ''
+        ].join('');
+        if (html) layer.bindPopup(html);
+      }
+    });   
+
+
     // レイヤーコントロール（右上）
     const overlays = {
       "崩壊（人為）": jsonArtif,
       "崩壊（自然）": jsonNatural,
-      "豪雨後災害（地理院）": jsonHz_afst
+      "豪雨後災害（地理院）": jsonHz_afst,
+      "盛土": jsonFill
     };
     L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
 
@@ -156,7 +174,8 @@
     Promise.all([
       fetch('src/json/artif.json').then(r => r.json()).then(g => { jsonArtif.addData(g); }),
       fetch('src/json/natural.json').then(r => r.json()).then(g => { jsonNatural.addData(g); }).catch(()=>{}),
-      fetch('src/json/afst_gsi.geojson').then(r => r.json()).then(g => { jsonHz_afst.addData(g); }).catch(()=>{})
+      fetch('src/json/afst_gsi.geojson').then(r => r.json()).then(g => { jsonHz_afst.addData(g); }).catch(()=>{}),
+      fetch('src/json/fill.geojson').then(r => r.json()).then(g => { jsonFill.addData(g); }).catch(()=>{})
     ]).then(() => {
       // 初期表示でONにしたいならコメント解除
       // if (jsonArtif.getLayers().length) jsonArtif.addTo(map);
