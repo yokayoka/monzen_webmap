@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>能登半島マップ（レイヤー参照＋現在地表示・モバイル対応）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { height: 100dvh; width: 100%; }
+    /* タップしやすいUI */
+    .leaflet-touch .leaflet-bar a { width: 42px; height: 42px; line-height: 42px; font-size: 16px; }
+
+    /* 右上コントロール（レイヤー）を前面に */
+    .leaflet-top.leaflet-right { z-index: 1100; }
+    /* 右下コントロール（ズーム＋現在地）を前面に */
+    .leaflet-bottom.leaflet-right { z-index: 1100; }
+
+    /* 現在地ボタンの見た目（Leaflet標準バーに合わせる） */
+    .leaflet-control-locate.leaflet-bar a {
+      text-align: center;
+      text-decoration: none;
+      display: block;
+      font-size: 20px;
+      line-height: 42px;
+    }
+    .leaflet-control-locate.leaflet-bar a:focus {
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // --- 初期中心（変更後の座標に合わせてください） ---
+    const ini = { lat: 37.29182, lng: 137.76769, zoom: 13 };
+
+    // ズームは右下に出したいので、map初期化時は zoomControl: false にして後から追加
+    const map = L.map('map', {
+      center: [ini.lat, ini.lng],
+      zoom: ini.zoom,
+      zoomControl: false,
+      tap: true,
+      tapTolerance: 15
+    });
+
+    // ズームコントロール（＋／−）を右下に
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // ---- Base layers ----
+    const lyrbfCSMap = L.tileLayer('https://www2.ffpri.go.jp/soilmap/tile/cs_noto/{z}/{x}/{y}.png', {
+      attribution: "CSMap by FFPRI", minZoom: 8, maxZoom: 17
+    }).addTo(map); // 既定レイヤ
+    const lyrafCSMap = L.tileLayer('https://rinya.geospatial.jp/tile/csmaptile_noto/{z}/{x}/{y}.png', {
+      attribution: "Forestry Agency", minZoom: 8, maxZoom: 17
+    });
+    const lyrGSI = L.tileLayer(
+      "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+      { opacity: 0.3, attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>" }
+    );
+    const lyrGoogleHybrid = L.tileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}");
+
+    const baseMaps = {
+      "地震前CS立体図": lyrbfCSMap,
+      "地震後CS立体図": lyrafCSMap,
+      "地理院地図": lyrGSI,
+      "Google高解像度": lyrGoogleHybrid
+    };
+
+    // ---- Overlays ----
+    // GeoJSONデータの読み込み
+
+
+    const overlays = {
+      "崩壊（人為）:": jsonArtif,
+      "崩壊（自然）:": jsonNatural
+    };
+
+    // レイヤーコントロールは右上
+    L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
+
+    // ======== 現在地表示（GPS）機能 ========
+    let locateMarker = null;
+    let locateCircle = null;
+
+    function showLocation(lat, lng, accuracy) {
+      const latlng = [lat, lng];
+      if (!locateMarker) {
+        locateMarker = L.marker(latlng, { title: "現在地" }).addTo(map);
+      } else {
+        locateMarker.setLatLng(latlng);
+      }
+
+      if (!locateCircle) {
+        locateCircle = L.circle(latlng, { radius: accuracy || 30, color: '#136aec', fillColor: '#136aec', fillOpacity: 0.15, weight: 2 }).addTo(map);
+      } else {
+        locateCircle.setLatLng(latlng);
+        if (accuracy) locateCircle.setRadius(accuracy);
+      }
+
+      // 現在のズームが低い場合は少し寄せる
+      const targetZoom = Math.max(map.getZoom(), 15);
+      map.setView(latlng, targetZoom, { animate: true });
+    }
+
+    function locateOnce() {
+      if (!navigator.geolocation) {
+        alert("この端末/ブラウザは位置情報に対応していません。");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          showLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+        },
+        (err) => {
+          // 典型的なエラー：PERMISSION_DENIED, POSITION_UNAVAILABLE, TIMEOUT
+          console.warn("Geolocation error:", err);
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              alert("位置情報の利用が許可されていません。ブラウザの設定をご確認ください。");
+              break;
+            case err.POSITION_UNAVAILABLE:
+              alert("現在地を特定できませんでした。屋外で再試行してください。");
+              break;
+            case err.TIMEOUT:
+              alert("位置情報の取得がタイムアウトしました。回線状況をご確認ください。");
+              break;
+            default:
+              alert("位置情報の取得に失敗しました。");
+          }
+        },
+        {
+          enableHighAccuracy: true, // できるだけ精度の高い位置
+          timeout: 10000,           // 10秒でタイムアウト
+          maximumAge: 0             // キャッシュは使わない
+        }
+      );
+    }
+
+    // Leafletのバーに「📍（現在地）」ボタンを追加（右下・ズームボタンの上側に並ぶ）
+    const LocateControl = L.Control.extend({
+      options: { position: 'bottomright' },
+      onAdd: function() {
+        const container = L.DomUtil.create('div', 'leaflet-control-locate leaflet-bar');
+        const link = L.DomUtil.create('a', '', container);
+        link.href = '#';
+        link.title = '現在地へ移動';
+        link.setAttribute('role', 'button');
+        link.setAttribute('aria-label', '現在地へ移動');
+        link.innerHTML = '📍';
+
+        // マップのドラッグ・ズームを抑止しつつクリック処理
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(link, 'click', (e) => {
+          L.DomEvent.preventDefault(e);
+          locateOnce();
+        });
+        return container;
+      }
+    });
+    map.addControl(new LocateControl());
+
+    // 画面回転や高さ変化に追従
+    addEventListener('orientationchange', () => setTimeout(() => map.invalidateSize(), 250));
+    addEventListener('resize', () => setTimeout(() => map.invalidateSize(), 250));
+  </script>
+</body>
+</html>

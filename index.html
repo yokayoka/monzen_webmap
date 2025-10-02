@@ -37,8 +37,8 @@
 
   <script>
     // --- 初期中心（変更後の座標に合わせてください） ---
-    const ini = { lat: 37.29182, lng: 137.76769, zoom: 13 };
-
+    const ini = { lat: 37.2934, lng: 136.7883, zoom: 13 };
+// 37.29340207473085, 136.78831307607857
     // ズームは右下に出したいので、map初期化時は zoomControl: false にして後から追加
     const map = L.map('map', {
       center: [ini.lat, ini.lng],
@@ -58,26 +58,84 @@
     const lyrafCSMap = L.tileLayer('https://rinya.geospatial.jp/tile/csmaptile_noto/{z}/{x}/{y}.png', {
       attribution: "Forestry Agency", minZoom: 8, maxZoom: 17
     });
-
-    const baseMaps = {
-      "災害前CS立体図": lyrbfCSMap,
-      "災害後CS立体図": lyrafCSMap
-    };
-
-    // ---- Overlays ----
     const lyrGSI = L.tileLayer(
       "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
       { opacity: 0.3, attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>" }
     );
     const lyrGoogleHybrid = L.tileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}");
 
-    const overlays = {
+    const baseMaps = {
+      "地震前CS立体図": lyrbfCSMap,
+      "地震後CS立体図": lyrafCSMap,
       "地理院地図": lyrGSI,
       "Google高解像度": lyrGoogleHybrid
     };
 
-    // レイヤーコントロールは右上
+    // ---- Overlays ----
+    // 1) まず中身が空の GeoJSON レイヤを作る（ここに後でデータを流し込む）
+    const jsonArtif = L.geoJSON(null, {
+      // ポイント表現（必要なら調整）
+      pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+        radius: 5, weight: 1, color: '#b22222', fillColor: '#ff6666', fillOpacity: 0.7
+      }),
+      // ライン/ポリゴンのスタイル（必要なら調整）
+      style: () => ({ color: '#b22222', weight: 2, fillOpacity: 0.3 }),
+      // クリック時の内容（プロパティ名は実データに合わせて調整）
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties || {};
+        const html = [
+          p.name ? `<div><strong>${p.name}</strong></div>` : '',
+          p.type ? `<div>種別: ${p.type}</div>` : '',
+          p.date ? `<div>日付: ${p.date}</div>` : ''
+        ].join('');
+        if (html) layer.bindPopup(html);
+      }
+    });
+
+    const jsonNatural = L.geoJSON(null, {
+      pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+        radius: 5, weight: 1, color: '#0b5', fillColor: '#6fdc6f', fillOpacity: 0.7
+      }),
+      style: () => ({ color: '#0b5', weight: 2, fillOpacity: 0.3 }),
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties || {};
+        const html = [
+          p.name ? `<div><strong>${p.name}</strong></div>` : '',
+          p.type ? `<div>種別: ${p.type}</div>` : '',
+          p.date ? `<div>日付: ${p.date}</div>` : ''
+        ].join('');
+        if (html) layer.bindPopup(html);
+      }
+    });
+
+    // 2) レイヤーコントロールに登録（右上）
+    const overlays = {
+      "崩壊（人為）": jsonArtif,
+      "崩壊（自然）": jsonNatural
+    };
     L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
+
+    // 3) JSON を非同期で読み込んで、作ったレイヤに addData する
+    //    GitHub Pages で配信するなら相対パスでOK（大文字小文字の違いに注意）
+    fetch('src/json/artif.json')
+      .then(r => r.json())
+      .then(geojson => { jsonArtif.addData(geojson); })
+      .catch(err => console.error('artif.json 読み込み失敗:', err));
+
+    fetch('src/json/natural.json')
+      .then(r => r.json())
+      .then(geojson => { jsonNatural.addData(geojson); })
+      .catch(err => console.error('natural.json 読み込み失敗:', err));
+
+
+
+    // const overlays = {
+    //   "崩壊（人為）": jsonArtif,
+    //   "崩壊（自然）": jsonNatural
+    // };
+
+    // レイヤーコントロールは右上
+    // L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
 
     // ======== 現在地表示（GPS）機能 ========
     let locateMarker = null;
